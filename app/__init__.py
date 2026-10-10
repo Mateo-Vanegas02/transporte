@@ -1,0 +1,1 @@
+"""FastAPI MySQL Application Package."""
