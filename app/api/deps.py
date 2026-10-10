@@ -3,8 +3,12 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.repositories.user_repository import UserRepository
-from app.services.user_service import UserService
+from app.repositories.conductor_repository import ConductorRepository
+from app.repositories.vehiculo_repository import VehiculoRepository
+from app.repositories.viaje_repository import ViajeRepository
+from app.services.conductor_service import ConductorService
+from app.services.vehiculo_service import VehiculoService
+from app.services.viaje_service import ViajeService
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -19,11 +23,21 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-def get_user_service(db: Session = Depends(get_db)) -> UserService:
-    """
-    Inyección de dependencias para UserService.
-    Instancia el UserRepository con la sesión de BD activa
-    y lo inyecta en el servicio de usuarios.
-    """
-    repository = UserRepository(db)
-    return UserService(repository)
+def get_conductor_service(db: Session = Depends(get_db)) -> ConductorService:
+    """Inyección de dependencias para ConductorService."""
+    repo = ConductorRepository(db)
+    return ConductorService(repo)
+
+
+def get_vehiculo_service(db: Session = Depends(get_db)) -> VehiculoService:
+    """Inyección de dependencias para VehiculoService."""
+    vehiculo_repo = VehiculoRepository(db)
+    conductor_repo = ConductorRepository(db)
+    return VehiculoService(vehiculo_repo, conductor_repo)
+
+
+def get_viaje_service(db: Session = Depends(get_db)) -> ViajeService:
+    """Inyección de dependencias para ViajeService."""
+    viaje_repo = ViajeRepository(db)
+    vehiculo_repo = VehiculoRepository(db)
+    return ViajeService(viaje_repo, vehiculo_repo)

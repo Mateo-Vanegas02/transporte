@@ -1,26 +1,60 @@
-# FastAPI MySQL - Arquitectura por Capas (Repository + Service)
+# Sistema de Gestión de Transporte - API REST
 
-API REST modular y desacoplada construida con **FastAPI**, **SQLAlchemy 2.0** y **MySQL**, siguiendo principios de diseño limpio, inyección de dependencias y separación estricta de responsabilidades.
+API REST profesional y modular para la gestión de transporte construida con **FastAPI**, **SQLAlchemy 2.0 (ORM tipado)** y **MySQL**, bajo una arquitectura desacoplada por capas (**Router -> Service -> Repository**) con inyección de dependencias (`Depends`), migraciones con **Alembic**, validaciones estrictas con **Pydantic v2** y suite exhaustiva de pruebas con **Pytest**.
 
 ---
 
-## 🏗️ Arquitectura del Sistema
+## 📌 Modelo de Dominio y Base de Datos
 
-El proyecto implementa un flujo desacoplado por capas:
+El sistema modela la operación de transporte vehicular mediante tres entidades relacionadas:
+
+```mermaid
+erDiagram
+    conductores ||--o{ vehiculos : "1 a muchos"
+    vehiculos ||--o{ viajes : "1 a muchos"
+
+    conductores {
+        int id_conductor PK "AUTO_INCREMENT"
+        string nombre "VARCHAR(100) NOT NULL"
+        string licencia UK "VARCHAR(20) NOT NULL UNIQUE"
+        string telefono "VARCHAR(15) NOT NULL"
+    }
+
+    vehiculos {
+        int id_vehiculo PK "AUTO_INCREMENT"
+        string placa UK "VARCHAR(10) NOT NULL UNIQUE"
+        string modelo "VARCHAR(50) NOT NULL"
+        int id_conductor FK "FK -> conductores ON UPDATE CASCADE ON DELETE RESTRICT"
+    }
+
+    viajes {
+        int id_viaje PK "AUTO_INCREMENT"
+        string destino "VARCHAR(100) NOT NULL"
+        date fecha "DATE NOT NULL"
+        int id_vehiculo FK "FK -> vehiculos ON UPDATE CASCADE ON DELETE RESTRICT"
+    }
+```
+
+---
+
+## 🏗️ Arquitectura por Capas
 
 ```
-Petición HTTP
-     │
-     ▼
-[Router (app/api/users.py)]
-     │ (Traduce DTOs y excepciones de dominio a HTTP 404, 409, etc.)
-     ▼
-[Service (app/services/user_service.py)]
-     │ (Reglas de negocio, validaciones de unicidad y excepciones propias)
-     ▼
-[Repository (app/repositories/user_repository.py)]
-     │ (Acceso directo a datos con SQLAlchemy 2.0, sin lógica de negocio)
-     ▼
+Petición Cliente HTTP
+        │
+        ▼
+[Router (app/api/)]
+        │ - Valida esquemas DTO (Pydantic v2)
+        │ - Traduce excepciones de dominio a códigos HTTP (404, 409, 422)
+        ▼
+[Service (app/services/)]
+        │ - Aplica reglas de negocio (unicidad, relaciones, validaciones)
+        │ - Desacoplado del protocolo HTTP (lanza excepciones de dominio)
+        ▼
+[Repository (app/repositories/)]
+        │ - Acceso exclusivo a datos con SQLAlchemy 2.0 (select, joinedload)
+        │ - Captura IntegrityError (rollback) y traduce colisiones concurrentes
+        ▼
 [Base de Datos (MySQL)]
 ```
 
@@ -30,66 +64,17 @@ Petición HTTP
 
 - **Python**: 3.11+
 - **Framework Web**: FastAPI + Uvicorn
-- **ORM**: SQLAlchemy 2.0 (estilo tipado con `Mapped` y `mapped_column`)
-- **Driver de BD**: PyMySQL + Cryptography
+- **ORM**: SQLAlchemy 2.0 (`Mapped`, `mapped_column`, `relationship`, `joinedload`)
+- **Driver MySQL**: PyMySQL + Cryptography
+- **Migraciones de BD**: Alembic
 - **Validación y Configuración**: Pydantic v2 + Pydantic-Settings
-- **Testing y Calidad**: Pytest, HTTPX, Black, Flake8
+- **Testing y Calidad**: Pytest, Pytest-cov, HTTPX, Black, Flake8
 
 ---
 
-## 📂 Estructura del Proyecto
+## 🚀 Instalación y Puesta en Marcha
 
-```
-fastapi_mysql/
-├── app/
-│   ├── __init__.py
-│   ├── main.py                     # Instancia de FastAPI y ciclo de vida (lifespan)
-│   ├── core/
-│   │   ├── __init__.py
-│   │   └── config.py               # Settings (Pydantic-Settings) y database_url
-│   ├── db/
-│   │   ├── __init__.py
-│   │   └── session.py              # Engine con pool_pre_ping, SessionLocal y Base ORM
-│   ├── models/
-│   │   ├── __init__.py
-│   │   └── user.py                 # Modelo SQLAlchemy 2.0 (tabla users)
-│   ├── schemas/
-│   │   ├── __init__.py
-│   │   └── user.py                 # DTOs Pydantic (UserCreate, UserUpdate, UserRead)
-│   ├── repositories/
-│   │   ├── __init__.py
-│   │   └── user_repository.py      # Capa de persistencia (SQLAlchemy queries)
-│   ├── services/
-│   │   ├── __init__.py
-│   │   └── user_service.py         # Lógica de negocio y excepciones de dominio
-│   └── api/
-│       ├── __init__.py
-│       ├── deps.py                 # Inyección de dependencias (get_db, get_user_service)
-│       └── users.py                # Endpoints HTTP /users
-├── tests/
-│   ├── __init__.py
-│   ├── conftest.py                 # Configuración de pruebas (SQLite in-memory + TestClient)
-│   └── test_users.py               # Casos de prueba exhaustivos del CRUD
-├── .env                            # Variables de entorno locales (ignorado por git)
-├── .env.example                    # Plantilla de variables de entorno
-├── .flake8                         # Configuración de linter Flake8
-├── .gitignore                      # Exclusiones de Git (.venv, .env, __pycache__, etc.)
-├── docker-compose.yml              # Contenedor de MySQL 8 para entorno local
-├── requirements.txt                # Dependencias de producción
-├── requirements-dev.txt            # Dependencias de desarrollo y testing
-└── README.md                       # Documentación del proyecto
-```
-
----
-
-## 🚀 Guía de Inicio Rápido
-
-### 1. Requisitos Previos
-
-- Python 3.11 o superior instalado.
-- MySQL Server 8.0+ instalado localmente o Docker Desktop.
-
-### 2. Crear y Activar Entorno Virtual
+### 1. Clonar y Crear Entorno Virtual
 
 En Windows (PowerShell):
 ```powershell
@@ -103,136 +88,140 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-### 3. Instalación de Dependencias
+### 2. Instalar Dependencias
 
-Para producción:
-```bash
+```powershell
+# Producción
 pip install -r requirements.txt
-```
 
-Para desarrollo y ejecución de pruebas:
-```bash
+# Entorno de desarrollo, pruebas y linters
 pip install -r requirements-dev.txt
 ```
 
-### 4. Configurar Variables de Entorno
+### 3. Configuración de Variables de Entorno
 
-Copia el archivo `.env.example` a `.env` y ajusta las credenciales de tu base de datos:
+Copia el archivo `.env.example` a `.env` y configura las credenciales de tu base de datos:
 
 ```bash
 cp .env.example .env
 ```
 
-Contenido del archivo `.env`:
+Contenido de `.env.example`:
 ```ini
 DB_USER=root
-DB_PASSWORD=root
+DB_PASSWORD=secret
 DB_HOST=localhost
 DB_PORT=3306
-DB_NAME=fastapi_db
+DB_NAME=transporte_db
 ```
+
+> **Nota de seguridad**: El archivo `.env` está estrictamente ignorado en `.gitignore` para evitar filtración de contraseñas.
 
 ---
 
-## 🗄️ Base de Datos
+## 🗄️ Base de Datos y Migraciones (Alembic)
 
-### Opción A: Levantar MySQL con Docker Compose (Recomendado)
-
-Ejecuta el siguiente comando para iniciar un contenedor de MySQL 8 configurado con charset UTF-8:
-
+### Base de Datos Local con Docker Compose (Opcional)
 ```bash
 docker compose up -d
 ```
 
-### Opción B: Crear la BD en un MySQL local existente
+### Migraciones con Alembic
+El proyecto utiliza **Alembic** para versionar la base de datos:
 
-Conéctate a tu cliente MySQL y crea la base de datos con soporte completo para UTF-8:
+1. **Si la base de datos ya contiene las tablas creadas**, márcala como sincronizada:
+   ```bash
+   alembic stamp head
+   ```
 
-```sql
-CREATE DATABASE fastapi_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+2. **Si estás en una base de datos nueva/vacía**, aplica las migraciones:
+   ```bash
+   alembic upgrade head
+   ```
+
+3. **Verificar la versión actual**:
+   ```bash
+   alembic current
+   ```
+
+### Carga de Datos Semilla (Idempotente)
+Se incluye un script para poblar la base de datos con 5 conductores, 5 vehículos y 8 viajes en Medellín:
+```bash
+python scripts/seed.py
 ```
+*(Puede ejecutarse múltiples veces de forma segura sin generar duplicados).*
 
 ---
 
-## ▶️ Ejecución del Servidor
+## ▶️ Ejecución de la API
 
-Inicia el servidor de desarrollo con recarga automática:
-
+Inicia el servidor en modo desarrollo:
 ```bash
 uvicorn app.main:app --reload
 ```
 
-- **API Base**: [http://127.0.0.1:8000](http://127.0.0.1:8000)
-- **Documentación Interactiva Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- **Documentación ReDoc**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
-- **Endpoint de Salud**: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
+- **Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **ReDoc**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+- **Health Check**: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
 
 ---
 
-## 🧪 Ejecución de Pruebas y Linters
+## 🧪 Pruebas Automatizadas y Calidad
 
-### Correr Pruebas Unitarias y de Integración
+Las pruebas utilizan una base de datos SQLite en memoria con `PRAGMA foreign_keys=ON` y la dependencia `get_db` sobrescrita, garantizando total independencia del servidor MySQL.
 
-Las pruebas utilizan SQLite en memoria (`sqlite:///:memory:`) con aislamiento por prueba, por lo que **no requieren que MySQL esté encendido**:
-
+### Ejecutar Pruebas con Cobertura de Código (> 85%)
 ```bash
-pytest -v
+pytest -v --cov=app --cov-report=term-missing
 ```
 
-### Comprobación de Calidad de Código (PEP 8)
-
-Formateo con Black:
+### Comprobación de Estilo (PEP 8)
 ```bash
-black --check app tests
-```
+# Formateo
+black --check app tests scripts
 
-Linter con Flake8:
-```bash
-flake8 app tests
+# Linter Flake8 (max-line-length 88)
+flake8 app tests scripts
 ```
 
 ---
 
-## 📡 Endpoints Disponibles
+## 📡 Catálogo de Endpoints
+
+Todos los endpoints de la API están prefijados bajo `/api/v1` (excepto `/health`):
+
+### 🚗 Conductores (`/api/v1/conductores`)
 
 | Método | Endpoint | Código Éxito | Descripción |
 |---|---|---|---|
-| `GET` | `/health` | `200 OK` | Verificación de estado de la API |
-| `GET` | `/users` | `200 OK` | Lista paginada (`?skip=0&limit=100`) de usuarios |
-| `GET` | `/users/{id}` | `200 OK` | Consulta usuario por ID (`404` si no existe) |
-| `POST` | `/users` | `201 Created` | Registra nuevo usuario (`409` si el email existe) |
-| `PUT` | `/users/{id}` | `200 OK` | Actualiza usuario (`404` o `409` si email en conflicto) |
-| `DELETE` | `/users/{id}` | `204 No Content` | Elimina usuario (`404` si no existe) |
+| `GET` | `/api/v1/conductores` | `200 OK` | Listar conductores (paginado `skip`, `limit`) |
+| `GET` | `/api/v1/conductores/{id}` | `200 OK` | Obtener conductor por ID (`404` si no existe) |
+| `GET` | `/api/v1/conductores/{id}/vehiculos` | `200 OK` | Listar vehículos asignados al conductor |
+| `POST` | `/api/v1/conductores` | `201 Created` | Crear conductor (`409` si licencia ya existe) |
+| `PUT` | `/api/v1/conductores/{id}` | `200 OK` | Reemplazo completo de conductor |
+| `PATCH` | `/api/v1/conductores/{id}` | `200 OK` | Actualización parcial (`422` si envía null) |
+| `DELETE` | `/api/v1/conductores/{id}` | `204 No Content` | Eliminar conductor (`409` si tiene vehículos) |
 
----
+### 🚙 Vehículos (`/api/v1/vehiculos`)
 
-## 🔄 Migración a Alembic (Próximos Pasos)
+| Método | Endpoint | Código Éxito | Descripción |
+|---|---|---|---|
+| `GET` | `/api/v1/vehiculos` | `200 OK` | Listar vehículos (paginado) |
+| `GET` | `/api/v1/vehiculos/{id}` | `200 OK` | Obtener vehículo por ID |
+| `GET` | `/api/v1/vehiculos/{id}/viajes` | `200 OK` | Listar viajes asignados al vehículo |
+| `POST` | `/api/v1/vehiculos` | `201 Created` | Crear vehículo (`404` si conductor no existe, `409` si placa duplicada) |
+| `PUT` | `/api/v1/vehiculos/{id}` | `200 OK` | Reemplazo completo de vehículo |
+| `PATCH` | `/api/v1/vehiculos/{id}` | `200 OK` | Actualización parcial (`422` si envía null) |
+| `DELETE` | `/api/v1/vehiculos/{id}` | `204 No Content` | Eliminar vehículo (`409` si tiene viajes) |
 
-El proyecto actualmente inicializa el esquema con `Base.metadata.create_all(bind=engine)` durante el arranque (`lifespan`). Para proyectos en producción con evolución de esquema, se recomienda migrar a **Alembic**:
+### 🛣️ Viajes (`/api/v1/viajes`)
 
-1. Instalar Alembic:
-   ```bash
-   pip install alembic
-   ```
-2. Inicializar entorno de migraciones:
-   ```bash
-   alembic init alembic
-   ```
-3. Configurar `alembic/env.py`:
-   - Importar la configuración y modelos:
-     ```python
-     from app.core.config import settings
-     from app.db.session import Base
-     from app.models.user import User  # Registrar modelos
-
-     target_metadata = Base.metadata
-     config.set_main_option("sqlalchemy.url", settings.database_url)
-     ```
-4. Generar la primera migración:
-   ```bash
-   alembic revision --autogenerate -m "create users table"
-   ```
-5. Aplicar migraciones:
-   ```bash
-   alembic upgrade head
-   ```
+| Método | Endpoint | Código Éxito | Descripción |
+|---|---|---|---|
+| `GET` | `/api/v1/viajes` | `200 OK` | Listar viajes con filtros (`fecha_desde`, `fecha_hasta`, `destino`, `id_vehiculo`, paginación) |
+| `GET` | `/api/v1/viajes/detalle` | `200 OK` | **Reporte consolidado** con JOIN de las 3 tablas (optimizado con `joinedload`) |
+| `GET` | `/api/v1/viajes/{id}` | `200 OK` | Obtener viaje por ID |
+| `POST` | `/api/v1/viajes` | `201 Created` | Crear viaje (`404` si vehículo no existe) |
+| `PUT` | `/api/v1/viajes/{id}` | `200 OK` | Reemplazo completo de viaje |
+| `PATCH` | `/api/v1/viajes/{id}` | `200 OK` | Actualización parcial (`422` si envía null) |
+| `DELETE` | `/api/v1/viajes/{id}` | `204 No Content` | Eliminar viaje |

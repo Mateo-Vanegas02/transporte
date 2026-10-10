@@ -1,4 +1,5 @@
 from urllib.parse import quote_plus
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,15 +9,22 @@ class Settings(BaseSettings):
     variables de entorno (.env).
     """
 
-    PROJECT_NAME: str = "FastAPI MySQL Users API"
+    PROJECT_NAME: str = "API Gestión de Transporte"
     API_V1_STR: str = "/api/v1"
+    ENVIRONMENT: str = "development"
 
     # Parámetros de base de datos MySQL
     DB_USER: str = "root"
-    DB_PASSWORD: str = "root"
+    DB_PASSWORD: str = Field(
+        ...,
+        description="Contraseña obligatoria para la conexión a la base de datos",
+    )
     DB_HOST: str = "localhost"
     DB_PORT: int = 3306
-    DB_NAME: str = "fastapi_db"
+    DB_NAME: str = "transporte_db"
+
+    # Flag para controlar si lifespan inicializa tablas (desactivado por Alembic)
+    INIT_DB_ON_STARTUP: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",
